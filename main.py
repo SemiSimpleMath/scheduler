@@ -1,0 +1,248 @@
+import copy
+import heapq as hq
+import itertools
+import sutils
+import kaggle_environments.envs.kore_fleets.helpers as kf
+import shipyardmanager
+import KoreManager
+import parameters
+
+
+print(f"{__name__} {parameters.VERSION}")
+
+DEBUG = False
+class Agent:
+    def __init__(self):
+        self.status = {}
+        self.board = None
+        self.config = None
+        self.scheduler = None
+        return
+
+    @property
+    def me(self):
+        return self.board.current_player
+
+    @property
+    def kore(self):
+        return self.me.kore
+
+    def generate_actions(self, board, config):
+        self.board = board
+        self.config = config
+        self.scheduler.update(board, config)
+        return self.scheduler.get_actions(board)
+
+
+class FleetInfo:
+    def __init__(self):
+        self.enemy_attacking_fleets = {}
+        return
+
+    def update(self, board):
+        me = board.current_player
+        players = board.players
+        enemy = None
+        for key, p in players.items():
+            if p.id != me.id:
+                enemy = p
+        enemy_fleets = enemy.fleets
+
+        enemy_fleet_ids = []
+        for e in enemy_fleets:
+            enemy_fleet_ids.append(e.id)
+        pop_these = []
+        for f in self.enemy_attacking_fleets:
+            if f not in enemy_fleet_ids:
+                pop_these.append(f)
+
+        for s_id in pop_these:
+            self.enemy_attacking_fleets.pop(s_id)
+
+    @staticmethod
+    def is_expanding(board):
+        fleets = board.current_player.fleets
+        for f in fleets:
+            if "C" in f.flight_plan:
+                return True
+        return False
+
+
+class Scheduler:
+    def __init__(self, board=None, config=None):
+        self.board = copy.deepcopy(board)
+        self.config = config
+        self.km = KoreManager.KoreManager(board, config)
+        self.sm = shipyardmanager.ShipyardManager()
+        self.counter = itertools.count()
+        self.priorities = []
+        self.fi = FleetInfo()
+
+    def update(self, board, config):
+        self.board = copy.deepcopy(board)
+        self.config = copy.deepcopy(config)
+        self.sm.update(self.board, self.config)
+        self.km.update(self.board)
+        self.fi.update(self.board)
+        sutils.cache.update(self.board)
+
+    def resolve_scheduled_events(self):
+
+        while len(self.priorities) > 0:
+
+            p, count, task = hq.heappop(self.priorities)
+
+            s_id = task["id"]
+            s = self.sm.get_shipyard_by_id(s_id)
+            if s is None:
+                assert 1 == 0 , f"{task['type']}"
+                continue
+            if s.assigned:
+                continue
+            s.assign_path.append(f"task: {task['type']}")
+            if DEBUG:
+                print(f"{self.board.step}: {s.position}, type {task['type']}, priority {task['priority']} reserved ,{task['reserved']}")
+            # update s.excess
+            s.compute_available(self.sm, s, task)
+
+            time_until_task = task["request_time"] - self.board.step
+
+            if time_until_task == 0:
+                self.assign_action(s, task)
+            elif task["type"] == "spawn_max_defense":
+                self.assign_action(s, task)
+            else:
+                s.assign_path.append(f"{task['type']} not ready yet.")
+
+
+
+    def assign_action(self, s, task):
+
+
+        if task["type"] == "round_trip":
+            s.assign_path.append("Trying round trip")
+            return self.sm.assign_return_route(self.board, s)
+
+        if task["type"] == "spawn_max":
+            s.assign_path.append("Trying spawn max")
+            return self.sm.spawn_max(s, self.km)
+
+        if task["type"] == "expand":
+            s.assign_path.append("Trying expand")
+            return self.sm.assign_expand(s)
+
+        if task["type"] == "defend":
+            s.assign_path.append("Trying defend")
+            return self.sm.assign_defend(s, task)
+
+        if task["type"] == "spawn_max_defense":
+            s.assign_path.append("Trying to spawn_max_defense")
+            if s.ship_count < task["reserved"]:
+                return self.sm.spawn_max(s, self.km)
+            s.assign_path.append("spawn_max_defense already reached the spawn goal")
+            return False
+
+        if task["type"] == "snipe":
+            s.assign_path.append("Trying to snipe")
+            location = task["location"]
+            path = sutils.get_snipe_path(s.position, location)
+            amount = task["reserved"]
+            if amount > s.excess:
+                return False
+            s.assign_path.append("snipe in main")
+            return self.sm.launch(s, path, amount)
+
+
+        if task["type"] == "attack_shipyard":
+            s.assign_path.append("Trying to attack shipyard")
+            return self.sm.attack_shipyard(s, task)
+
+
+        return
+
+    def update_task_queue(self):
+        for s in self.sm.shipyards:
+            if s.defending:
+                debug = 1
+            temp = []
+            assert len(s.tasks) >= 2
+            counter = 0
+            while len(s.tasks) > 0:
+                task = s.tasks.pop(0)
+                p = task["priority"]
+                if task["request_time"] >= self.board.step + 50:
+                    print("VERY STRANGE REQUEST TIME")
+                    print(f"{s.assign_path}")
+                    continue
+                if task["request_time"] >= self.board.step:
+                    hq.heappush(self.priorities, (p, next(self.counter), task))
+                    counter += 1
+                if task["request_time"] > self.board.step:
+                    temp.append(task)
+            assert counter >= 2
+            s.tasks = temp
+
+    def get_actions(self, board):
+        self.assign_priority_tasks()
+        self.update_task_queue()
+        self.resolve_scheduled_events()
+        actions = self.get_shipyard_actions(self.sm)
+        me = board.current_player
+        for s_id, action in actions.items():
+            for sy in me.shipyards:
+                if sy.id == s_id:
+                    sy.next_action = action
+
+
+        DEBUG = False
+        if DEBUG:
+            print(f"+++++++++++++++ Actions for step: {self.board.step} ++++++++++++++++++++++++++")
+            for s_id, action in actions.items():
+                for sy in self.sm.shipyards:
+                    if sy.id == s_id and sy.assigned is False:
+                        print(f"{sy.ship_count}, {sy.position} is s assigned {action} {sy.assigned}, {sy.assign_path}")
+                        if not sy.assigned:
+                            print("ASSIGN PATH", sy.assign_path)
+            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        test = me.next_actions
+        return me.next_actions
+
+    def assign_priority_tasks(self):
+
+        self.sm.assign_defenders(self.fi, self.km, self.board)
+        self.sm.assign_short_distance_attackers()
+        self.sm.assign_avalanche_attackers()
+        self.sm.assign_expanders(self.km)
+        self.sm.assign_unstoppable_attack(self.km)
+        self.sm.assign_attack(self.km)
+        #self.sm.assign_reinforce()
+        #self.sm.assign_snipe()
+
+
+
+        return
+
+    @staticmethod
+    def get_shipyard_actions(sm):
+        action_dict = {}
+        for s in sm.shipyards:
+            action_dict[s.id] = s.this_turn_action
+        return action_dict
+
+player = Agent()
+player.scheduler = Scheduler()
+cache = sutils.CacheData()
+
+def agent(obs, config):
+    global player
+    global cache
+    board = kf.Board(obs, config)
+    if player is None:
+        player = Agent()
+        player.scheduler = Scheduler()
+    if cache is None:
+        cache = sutils.CacheData()
+    # obs_special = unit_test.special_board
+    # board_special = kf.Board(obs_special, config)
+    # return player.generate_actions(board_special, config)
+    return player.generate_actions(board, config)
