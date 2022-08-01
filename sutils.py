@@ -93,8 +93,8 @@ class CacheData:
     def get_numpy_board(self):
         return self.np_board
 
-
 cache = CacheData()
+
 
 
 def manhattan_distance(board, pt1, pt2):
@@ -487,45 +487,47 @@ def generate_all_rectangles(start, board, max_length=None):
 def generate_all_one_shifted_rectangles(board, start, max_length):
 
     d1 = ""
+    d2 = ""
+    paths = []
     for dir1 in range(0, 4):
         if dir1 == 0:
             d1 = "N"
-        if dir1 == 1:
+        if d1 == 1:
             d1 = "E"
         if dir1 == 2:
             d1 = "S"
         if dir1 == 3:
             d1 = "W"
 
-    d2 = ""
-    paths = []
-    for dir2 in range(0, 4):
-        if dir2 == 0:
-            d2 = "N"
-        if dir2 == 1:
-            d2 = "E"
-        if dir2 == 2:
-            d2 = "S"
-        if dir2 == 3:
-            d2 = "W"
-
-        for dir3 in range(0, 4):
-            if dir3 == dir2 or dir3 == DIRS.index(get_opposite_dir(d2)):
+        for dir2 in range(0, 4):
+            if dir2 == dir1 or dir2 == DIRS.index(get_opposite_dir(d1)):
                 continue
             if dir2 == 0:
-                d3 = "N"
-            if dir3 == 1:
-                d3 = "E"
-            if dir3 == 2:
-                d3 = "S"
-            if dir3 == 3:
-                d3 = "W"
+                d2 = "N"
+            if dir2 == 1:
+                d2 = "E"
+            if dir2 == 2:
+                d2 = "S"
+            if dir2 == 3:
+                d2 = "W"
+
+            d3 = get_opposite_dir(d2)
+            d4 = get_opposite_dir(d1)
 
             for dist1 in range(1, 10):
                 for dist2 in range(1, 10):
-                    if 2 * (dist1 + dist2) > max_length:
+                    if 2 * (dist1 + dist2) + 2> max_length:
                         continue
-                    paths.append(rectangle_path(board, start, d1, dist1, d2, dist2))
+
+                    seg1 = path_class.PathSegment(start, d1,1)
+                    end1 = seg1.get_end(board)
+                    seg2 = path_class.PathSegment(end1, d2, dist1)
+                    end2 = seg2.get_end(board)
+                    seg3 = path_class.PathSegment(end2, d3, dist2)
+                    end3 = seg3.get_end(board)
+                    seg4 = path_class.PathSegment(end3, d4, 1)
+
+                    paths.append(path_class.Path([seg1, seg2, seg3, seg4]))
 
     return paths
 
@@ -585,6 +587,7 @@ def generate_return_path_with_most_kore(board, s, shipyards, start, max_length=4
 
     if (start, max_length) not in cache.routes:
 
+        #one_shifted_rectangles = generate_all_one_shifted_rectangles(board, start, max_length)
         boomerangs = generate_all_boomerangs(start, board, max_length)
         rectangles = generate_all_rectangles(start, board, max_length)
         yoyos = generate_yoyos(start, board, max_length)
@@ -623,6 +626,7 @@ def generate_return_path_with_most_kore(board, s, shipyards, start, max_length=4
         paths_13 += paths_8[:]
 
         paths_34 += paths_21[:]
+        #paths_34 += one_shifted_rectangles[:]
 
         if len(paths_34) > 0:
             for p in paths_34:
@@ -721,43 +725,9 @@ def find_flight_plans_that_attack_shipyard(board, shipyard):
     attack_size = enemy_count + 100
     return fp, attack_size
 
-
-def convert_flight_plan_string_to_list(s):
-    result = []
-    num_string = ""
-    for c in s:
-
-        if c.isdigit():
-            num_string += c
-        else:
-            if num_string:
-                result.append(num_string)
-                num_string = ""
-                result.append(c)
-            else:
-                result.append(c)
-    if num_string:
-        result.append(num_string)
-    return result
-
-
-def get_enemy_fleets(board):
-    me = board.current_player
-    enemy = None
-    players = board.players
-
-    for key, p in players.items():
-        if p.id != me.id:
-            enemy = p
-    fleets = enemy.fleets
-
-    return fleets
-
-
-def under_attack(board):
+def under_attack(board, fleets):
     me = board.current_player
     my_shipyards = me.shipyards
-    fleets = get_enemy_fleets(board)
     attacking_fleets = {}
     for f in fleets:
         pts = get_pts_on_fleets_path(board, f)
@@ -769,19 +739,6 @@ def under_attack(board):
                 attacking_fleets[f.id]["target"] = sy.id
 
     return attacking_fleets
-
-
-def shipyard_ship_count_threshold(board, threshold):
-    me = board.current_player
-
-    for shipyard in me.shipyards:
-        if shipyard.ship_count < threshold:
-            return False
-    return True
-
-
-def get_shipyards(board, player):
-    return board.shipyards[player.id]
 
 
 def get_fp_last_dir(fp):
@@ -824,24 +781,6 @@ def get_pts_on_fleets_path(board, f):
                 return pts
         pts += extendo
     return pts
-
-
-def get_shipyard_locations(shipyards):
-    locations = []
-    for s in shipyards:
-        locations.append(s.position)
-    return locations
-
-
-def number_of_turns_to_get_home(board, shipyard, f):
-    fp_pts = get_pts_on_fleets_path(board, f)
-    turns = 1
-    for p in fp_pts:
-        if shipyard.position == p:
-            return True, turns
-        turns += 1
-
-    return False, -1
 
 
 def pts_in_direction(board, start, direction, steps):
@@ -924,14 +863,6 @@ def returning_fleets_in_n_turns(board, fleets, position, steps):
             if arrival_time <= steps:
                 returning_fleets.append(f)
     return returning_fleets
-
-
-def find_fleets_pts(board, fleets):
-    pts = []
-    for f in fleets:
-        pts.append(get_pts_on_fleets_path(board, f))
-
-    return pts
 
 
 def check_path_safety(board, path, fleets):
@@ -1310,9 +1241,6 @@ def find_best_path(ranked_paths, ships, ships_min, ships_max, board, my_fleets, 
             return None, -1, 0
         index, r, best_size, fp = hq.heappop(ranked_paths)
 
-        if fp.get_compact_path() == "N5W7E7S":
-            debug = 1
-
         if best_size < ships_min or best_size > ships_max:
             continue
 
@@ -1331,9 +1259,6 @@ def find_best_path(ranked_paths, ships, ships_min, ships_max, board, my_fleets, 
 
         if not_safe:
             if avoid_risk:
-                continue
-            risk = path_risk2(board, fp, my_shipyards, enemy_shipyards)
-            if risk > 20:
                 continue
             return fp, max(best_size, int(1.5 * enemy_ships)), index
 

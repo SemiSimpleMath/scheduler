@@ -157,6 +157,9 @@ class Scheduler:
             s.assign_path.append("Trying to attack shipyard")
             return self.sm.attack_shipyard(s, task)
 
+        if task["type"] == "abandon":
+            return self.sm.abandon(s, task)
+
 
         return
 
@@ -249,7 +252,6 @@ class Scheduler:
 
 player = Agent()
 player.scheduler = Scheduler()
-cache = sutils.CacheData()
 predictions = []
 actual = {}
 def agent(obs, config):
@@ -259,8 +261,5 @@ def agent(obs, config):
     if player is None:
         player = Agent()
         player.scheduler = Scheduler()
-    if cache is None:
-        cache = sutils.CacheData()
-
 
     return player.generate_actions(board, config)

@@ -1,6 +1,6 @@
 
 import subprocess
-num_games = 100
+num_games = 1000
 
 
 from collections import defaultdict

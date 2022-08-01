@@ -3,7 +3,7 @@ expo_locations_p0 = [kf.Point(7, 11)] #, kf.Point(4, 12), kf.Point(8, 16)]  # , 
 expo_locations_p1 = [kf.Point(13, 8), kf.Point(17, 8), kf.Point(9, 4)]  # , kf.Point(12, 3), kf.Point(16, 11), kf.Point(15, 10)]
 
 USE_EXPO_LOCATIONS = True
-
+ABANDON_PRIORITY = 7
 SPAWN_MAX_DEFENSE_PRIORITY = -9
 UNSTOPPABLE_ATTACK_PRIORITY = -8.5
 ATTACK_PRIORITY = -5
@@ -12,7 +12,7 @@ EXPO_PRIORITY = -6
 DEFEND_PRIORITY = -9
 SHORT_DISTANCE_ATTACK_PRIORITY = -8
 SNIPE_PRIORITY = -4.5
-REINFORCE_PRIORITY = -4.4
+REINFORCE_PRIORITY = -4.8
 ROUND_TRIP_PRIORITY = -4
 SPAWN_PRIORITY = -3
 LAY_IN_WAIT_PRIORITY = -4.5

@@ -55,7 +55,7 @@ class Shipyard:
         spawn_priority = parameters.SPAWN_PRIORITY - self.max_spawn / 10
         # if me.kore > enemy.kore + 2000 and len(me.shipyards) > len(enemy.shipyards):
         #     spawn_priority -= 1
-        if me.kore > 500 and self.ship_count < 50:
+        if me.kore > 500 and self.ship_count < 80:
             spawn_priority -= .4
         task = {"id": self.id, "type": "spawn_max", "request_time": turn, "reserved": -1,
                 "reserve_type": 0, "priority": spawn_priority}

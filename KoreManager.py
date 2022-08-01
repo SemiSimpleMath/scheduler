@@ -30,15 +30,6 @@ class KoreManager:
         # this is the kore left that has been unallocated for this turn
         return self.kore
 
-    def get_estimated_kore_rate(self):
-        return self.estimated_kore_rate
-
-    def most_can_spend(self):
-        ms = 0
-        for s in self.me.shipyards:
-            ms += s.max_spawn
-        return self.spawn_cost * ms
-
     def update_kore(self, amount):
         self.kore_left += amount
         self.amount_spent_this_turn += amount

@@ -2,9 +2,9 @@ import json
 import main
 
 
-FROM, TO = 245, 260       # Replay steps range
+FROM, TO = 222, 260       # Replay steps range
 PLAYER = 0                  # Player number
-FILE="./replays/chad_loss_5.json"
+FILE="./replays/chad_loss_350.json"
 
 with open(FILE, "r") as cin:
     f = cin.read()
