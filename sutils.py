@@ -450,6 +450,87 @@ def generate_all_one_ways(start, board):
     return paths
 
 
+def generate_all_rectangles(start, board, max_length=None):
+    d1 = ""
+    d2 = ""
+    paths = []
+    for dir1 in range(0, 4):
+        if dir1 == 0:
+            d1 = "N"
+        if dir1 == 1:
+            d1 = "E"
+        if dir1 == 2:
+            d1 = "S"
+        if dir1 == 3:
+            d1 = "W"
+
+        for dir2 in range(0, 4):
+            if dir2 == dir1 or dir2 == DIRS.index(get_opposite_dir(d1)):
+                continue
+            if dir2 == 0:
+                d2 = "N"
+            if dir2 == 1:
+                d2 = "E"
+            if dir2 == 2:
+                d2 = "S"
+            if dir2 == 3:
+                d2 = "W"
+
+            for dist1 in range(1, 10):
+                for dist2 in range(1, 10):
+                    if 2 * (dist1 + dist2) > max_length:
+                        continue
+                    paths.append(rectangle_path(board, start, d1, dist1, d2, dist2))
+
+    return paths
+
+def generate_all_one_shifted_rectangles(board, start, max_length):
+
+    d1 = ""
+    for dir1 in range(0, 4):
+        if dir1 == 0:
+            d1 = "N"
+        if dir1 == 1:
+            d1 = "E"
+        if dir1 == 2:
+            d1 = "S"
+        if dir1 == 3:
+            d1 = "W"
+
+    d2 = ""
+    paths = []
+    for dir2 in range(0, 4):
+        if dir2 == 0:
+            d2 = "N"
+        if dir2 == 1:
+            d2 = "E"
+        if dir2 == 2:
+            d2 = "S"
+        if dir2 == 3:
+            d2 = "W"
+
+        for dir3 in range(0, 4):
+            if dir3 == dir2 or dir3 == DIRS.index(get_opposite_dir(d2)):
+                continue
+            if dir2 == 0:
+                d3 = "N"
+            if dir3 == 1:
+                d3 = "E"
+            if dir3 == 2:
+                d3 = "S"
+            if dir3 == 3:
+                d3 = "W"
+
+            for dist1 in range(1, 10):
+                for dist2 in range(1, 10):
+                    if 2 * (dist1 + dist2) > max_length:
+                        continue
+                    paths.append(rectangle_path(board, start, d1, dist1, d2, dist2))
+
+    return paths
+
+
+
 def kore_in_flight_path(board, flight_path, collection_rate):
     total_kore = 0
     steps = 0
@@ -613,42 +694,6 @@ def generate_return_path_with_most_kore(board, s, shipyards, start, max_length=4
         hq.heappush(ranked_paths, (-1000 * score, random.random(), 8, path))
 
     return ranked_paths
-
-
-def generate_all_rectangles(start, board, max_length=None):
-    d1 = ""
-    d2 = ""
-    paths = []
-    for dir1 in range(0, 4):
-        if dir1 == 0:
-            d1 = "N"
-        if dir1 == 1:
-            d1 = "E"
-        if dir1 == 2:
-            d1 = "S"
-        if dir1 == 3:
-            d1 = "W"
-
-        for dir2 in range(0, 4):
-            if dir2 == dir1 or dir2 == DIRS.index(get_opposite_dir(d1)):
-                continue
-            if dir2 == 0:
-                d2 = "N"
-            if dir2 == 1:
-                d2 = "E"
-            if dir2 == 2:
-                d2 = "S"
-            if dir2 == 3:
-                d2 = "W"
-
-            for dist1 in range(1, 10):
-                for dist2 in range(1, 10):
-                    if 2 * (dist1 + dist2) > max_length:
-                        continue
-                    paths.append(rectangle_path(board, start, d1, dist1, d2, dist2))
-
-    return paths
-
 
 def get_closest_enemy_shipyard(board, position, me):
     min_dist = board.configuration.size
@@ -1271,6 +1316,14 @@ def find_best_path(ranked_paths, ships, ships_min, ships_max, board, my_fleets, 
         if best_size < ships_min or best_size > ships_max:
             continue
 
+        # if contains_unwanted_shipyard(board, fp, my_shipyards):
+        #     # print("rejecting because contains unwanted shipyard")
+        #     continue
+        #
+        # if contains_unwanted_shipyard(board, fp, enemy_shipyards):
+        #     # print("rejecting because contains unwanted shipyard")
+        #     continue
+
         not_safe = False
         enemy_ships = 21
         if len(enemy_fleets) < 15:
@@ -1278,6 +1331,9 @@ def find_best_path(ranked_paths, ships, ships_min, ships_max, board, my_fleets, 
 
         if not_safe:
             if avoid_risk:
+                continue
+            risk = path_risk2(board, fp, my_shipyards, enemy_shipyards)
+            if risk > 20:
                 continue
             return fp, max(best_size, int(1.5 * enemy_ships)), index
 

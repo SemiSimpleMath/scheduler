@@ -6,7 +6,7 @@ import kaggle_environments.envs.kore_fleets.helpers as kf
 import shipyardmanager
 import KoreManager
 import parameters
-
+import unit_tests
 
 print(f"{__name__} {parameters.VERSION}")
 
@@ -183,6 +183,8 @@ class Scheduler:
             s.tasks = temp
 
     def get_actions(self, board):
+        global predictions
+        global actual
         self.assign_priority_tasks()
         self.update_task_queue()
         self.resolve_scheduled_events()
@@ -204,7 +206,23 @@ class Scheduler:
                         if not sy.assigned:
                             print("ASSIGN PATH", sy.assign_path)
             print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        test = me.next_actions
+
+        # if board.step == 90:
+        #     for i in range(1, 11):
+        #         predictions.append(sutils.amount_of_kore_returning_in_n_steps(board, board.current_player, i))
+        # if 90 < board.step < 102:
+        #     actual[board.step] = {}
+        #     actual[board.step]["start"]=me.kore
+        #     actual[board.step]["spent"]=self.km.amount_spent_this_turn
+        #     actual[board.step]["end"] = me.kore + self.km.amount_spent_this_turn
+        #     if board.step - 1 in actual:
+        #         actual[board.step]["gain"] = actual[board.step]["start"] - actual[board.step-1]["end"]
+        #
+        #
+        # if len(actual) == 10:
+        #     print(predictions)
+        #     unit_tests.test_amount_of_kore_in_n_turns(predictions, actual)
+
         return me.next_actions
 
     def assign_priority_tasks(self):
@@ -232,7 +250,8 @@ class Scheduler:
 player = Agent()
 player.scheduler = Scheduler()
 cache = sutils.CacheData()
-
+predictions = []
+actual = {}
 def agent(obs, config):
     global player
     global cache
@@ -242,7 +261,6 @@ def agent(obs, config):
         player.scheduler = Scheduler()
     if cache is None:
         cache = sutils.CacheData()
-    # obs_special = unit_test.special_board
-    # board_special = kf.Board(obs_special, config)
-    # return player.generate_actions(board_special, config)
+
+
     return player.generate_actions(board, config)

@@ -1,5 +1,5 @@
 import kaggle_environments.envs.kore_fleets.helpers as kf
-expo_locations_p0 = [kf.Point(7, 11), kf.Point(4, 12), kf.Point(8, 16)]  # , kf.Point(3, 9), kf.Point(3, 18)]
+expo_locations_p0 = [kf.Point(7, 11)] #, kf.Point(4, 12), kf.Point(8, 16)]  # , kf.Point(3, 9), kf.Point(3, 18)]
 expo_locations_p1 = [kf.Point(13, 8), kf.Point(17, 8), kf.Point(9, 4)]  # , kf.Point(12, 3), kf.Point(16, 11), kf.Point(15, 10)]
 
 USE_EXPO_LOCATIONS = True
@@ -24,14 +24,13 @@ hopeless_attack_parameter = 7
 WAIT_STEPS = 5 # How long to wait if you don't have perfect send amount
 CLOSEST_SHIPYARD = 4 # new expo locations  CLOSEST_SHIPYARD <= dist <= FURTHEST_SHIPYARD
 FURTHEST_SHIPYARD = 10
-attack_random_param = .7
-# good numbers so far 5,2
+# good numbers so far 5,1
 paths_overlap_param1 = 5 # num of points that two paths can share before they are considered to overlap
 paths_overlap_param2 = 1 # num of fleets that are allowed to overlap
 
 
 MAX_WAIT_TIME_TO_EXPO = 20
 USE_SY_PATHS = False
-VERSION = 1.41
+VERSION = 1.46
 
 print(f"{__name__} {VERSION}")
