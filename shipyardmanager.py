@@ -75,6 +75,7 @@ class ShipyardManager:
         self.pending_expansions = 0
         self.intended_expos = {}
         self.true_expos = []
+        self.kore = 0
 
         return
 
@@ -87,6 +88,7 @@ class ShipyardManager:
         self.board = board
         self.config = config
         self.me = self.board.current_player
+        self.kore = self.me.kore
         my_shipyard_ids = [s.id for s in self.shipyards]
         my_board_shipyards = board.players[self.me.id].shipyards
         my_board_shipyard_ids = [s.id for s in my_board_shipyards]
@@ -711,7 +713,7 @@ class ShipyardManager:
                 return True
         return False
 
-    def should_attack(self, s, km):
+    def should_attack(self, s):
         if self.is_attacking(s):
             return False
         if s.excess < 50:
@@ -739,9 +741,9 @@ class ShipyardManager:
         #     return True
         # return False
 
-    def assign_attack(self, km):
+    def assign_attack(self):
         for s in self.shipyards:
-            if not self.should_attack(s, km):
+            if not self.should_attack(s):
                 s.assign_path.append("at assign_attack. should not attack")
                 continue
             enemy = self.get_enemy()
@@ -779,13 +781,13 @@ class ShipyardManager:
                             "reserve_type": 1, "priority": parameters.ATTACK_PRIORITY, "id": s.id}
                     s.push_task(task)
 
-    def assign_unstoppable_attack(self, km):
+    def assign_unstoppable_attack(self):
 
         enemy = self.get_enemy()
         enemy_shipyards = enemy.shipyards
         # find indefensible shipyards
         for s in self.shipyards:
-            if not self.should_attack(s, km):
+            if not self.should_attack(s):
                 continue
 
             for e in enemy_shipyards:
@@ -850,8 +852,8 @@ class ShipyardManager:
                     s.assign_path.append("snipe")
                     print("SNIPING", "time now", self.board.step, "wait for", wait_time, "target", target, 2 * fs + 1)
 
-    def assign_expanders(self, km):
-        if not self.should_expand(km):
+    def assign_expanders(self):
+        if not self.should_expand():
             return
 
         m_count = 50
@@ -1003,7 +1005,7 @@ class ShipyardManager:
 
         return None
 
-    def can_we_defend(self, target_s, fleet, km):
+    def can_we_defend(self, target_s, fleet):
         attack_time = fleet["step"]
         fleet_size = fleet["size"]
         fleets = self.me.fleets
@@ -1013,7 +1015,7 @@ class ShipyardManager:
                                                fleet["step"] - self.board.step)
 
         max_target_can_spawn = min((target_s.max_spawn * (attack_time - self.board.step)),
-                                   km.kore / km.spawn_cost)
+                                   self.kore / self.config.spawnCost)
         max_target_can_get = int(max_target_can_spawn) + num + target_s.ship_count
 
         for s in self.shipyards:
@@ -1043,7 +1045,6 @@ class ShipyardManager:
 
             num_r = min(num_r, needed)
 
-
             needed -= num_r
 
             if needed <= 0:
@@ -1051,7 +1052,7 @@ class ShipyardManager:
 
         return False
 
-    def cannot_defend_abandon_ship(self,s, attack_time):
+    def cannot_defend_abandon_ship(self, s, attack_time):
         task = {"type": "abandon", "request_time": attack_time,
                 "reserved": 500, "reserve_type": 1, "priority": parameters.ABANDON_PRIORITY,
                 "id": s.id, }
@@ -1071,15 +1072,16 @@ class ShipyardManager:
                 min_dist = distance
                 target_s = sy
         if target_s is not None:
-            fp = sutils.find_path_connecting_two_points(self.board, s.position, target_s.position, self.shipyards, search_rad=5)
+            fp = sutils.find_path_connecting_two_points(self.board, s.position, target_s.position, self.shipyards,
+                                                        search_rad=5)
         else:
             return False
-        print("Sending abandon fleet")
+        if DEFENSE_LOGGING:
+            print(f"{self.board.step}: location {s.position}. Sending abandon fleet {fp.get_compact_path()}")
         fp = fp.get_compact_path()
         return self.launch(s, fp, amount)
 
-
-    def assign_defenders(self, fi, km, board):
+    def assign_defenders(self, fi, board):
 
         defense_priority = parameters.DEFEND_PRIORITY
         attacking_fleets = sutils.under_attack(self.board, self.get_enemy().fleets)
@@ -1097,7 +1099,7 @@ class ShipyardManager:
                 target_s.delete_task(f)
                 for sy in self.shipyards:
                     sy.delete_task(f)
-            if not self.can_we_defend(target_s, fleet, km):
+            if not self.can_we_defend(target_s, fleet):
                 if DEFENSE_LOGGING:
                     print(f"{self.board.step} cannot defend {target_s.position}")
                 self.cannot_defend_abandon_ship(target_s, attack_time)
@@ -1107,7 +1109,7 @@ class ShipyardManager:
                                                    attack_time - board.step)
 
             max_target_can_spawn = min((target_s.max_spawn * (attack_time - board.step)),
-                                       km.kore / km.spawn_cost)
+                                       self.kore / self.config.spawnCost)
             max_target_can_get = int(max_target_can_spawn) + num + target_s.ship_count
 
             defense_priority = parameters.DEFEND_PRIORITY - target_s.max_spawn / 10
@@ -1208,7 +1210,7 @@ class ShipyardManager:
 
         return count
 
-    def can_spend_incoming_kore(self, km, spend_turns):
+    def can_spend_incoming_kore(self, spend_turns):
 
         if self.board.step > 150:
             debug = 1
@@ -1259,7 +1261,7 @@ class ShipyardManager:
 
         return True
 
-    def should_expand(self, km):
+    def should_expand(self):
 
         num_pending_expos = self.num_fleets_expanding(self.me.fleets) + self.num_expansions_in_tasks()
 
@@ -1292,7 +1294,7 @@ class ShipyardManager:
             if EXPO_LOGGING:
                 print(f"{self.board.step} Lets expo")
             return True
-        if self.can_spend_incoming_kore(km, 20):
+        if self.can_spend_incoming_kore(20):
             if EXPO_LOGGING:
                 print(f"{self.board.step} Can spend all kore just fine in 20 turns")
             return False
@@ -1300,19 +1302,19 @@ class ShipyardManager:
             print(f"{self.board.step} Lets expo")
         return True
 
-    def spawn_max(self, s, km):
+    def spawn_max(self, s):
         # max spawn
         if self.board.step >= 390 and len(self.shipyards) > 5:
             s.assign_path.append("not spawning turn limit")
             return False
-        spawn_amount = min(km.get_kore_left() // km.spawn_cost, s.max_spawn)
+        spawn_amount = min(self.kore // self.config.spawnCost, s.max_spawn)
         if spawn_amount == 0:
             logging.debug(
-                f"{self.board.step} Supposed to spawn max but i guess not enough money??, {km.get_kore_left()}")
+                f"{self.board.step} Supposed to spawn max but i guess not enough money??, {self.kore}")
             s.assign_path.append("Not spawning. out of money")
             return False
-        kore_to_spend = spawn_amount * km.spawn_cost
-        km.update_kore(-kore_to_spend)
+        kore_to_spend = spawn_amount * self.config.spawnCost
+        self.kore -= kore_to_spend
         s.this_turn_action = kf.ShipyardAction.spawn_ships(int(spawn_amount))
         s.assign_path.append("spawned max")
         s.assigned = True

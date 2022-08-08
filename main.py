@@ -4,7 +4,6 @@ import itertools
 import sutils
 import kaggle_environments.envs.kore_fleets.helpers as kf
 import shipyardmanager
-import KoreManager
 import parameters
 import unit_tests
 
@@ -72,7 +71,6 @@ class Scheduler:
     def __init__(self, board=None, config=None):
         self.board = copy.deepcopy(board)
         self.config = config
-        self.km = KoreManager.KoreManager(board, config)
         self.sm = shipyardmanager.ShipyardManager()
         self.counter = itertools.count()
         self.priorities = []
@@ -82,7 +80,6 @@ class Scheduler:
         self.board = copy.deepcopy(board)
         self.config = copy.deepcopy(config)
         self.sm.update(self.board, self.config)
-        self.km.update(self.board)
         self.fi.update(self.board)
         sutils.cache.update(self.board)
 
@@ -125,7 +122,7 @@ class Scheduler:
 
         if task["type"] == "spawn_max":
             s.assign_path.append("Trying spawn max")
-            return self.sm.spawn_max(s, self.km)
+            return self.sm.spawn_max(s)
 
         if task["type"] == "expand":
             s.assign_path.append("Trying expand")
@@ -138,7 +135,7 @@ class Scheduler:
         if task["type"] == "spawn_max_defense":
             s.assign_path.append("Trying to spawn_max_defense")
             if s.ship_count < task["reserved"]:
-                return self.sm.spawn_max(s, self.km)
+                return self.sm.spawn_max(s)
             s.assign_path.append("spawn_max_defense already reached the spawn goal")
             return False
 
@@ -230,12 +227,12 @@ class Scheduler:
 
     def assign_priority_tasks(self):
 
-        self.sm.assign_defenders(self.fi, self.km, self.board)
+        self.sm.assign_defenders(self.fi, self.board)
         self.sm.assign_short_distance_attackers()
         self.sm.assign_avalanche_attackers()
-        self.sm.assign_expanders(self.km)
-        self.sm.assign_unstoppable_attack(self.km)
-        self.sm.assign_attack(self.km)
+        self.sm.assign_expanders()
+        self.sm.assign_unstoppable_attack()
+        self.sm.assign_attack()
         #self.sm.assign_reinforce()
         #self.sm.assign_snipe()
 
