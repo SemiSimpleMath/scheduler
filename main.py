@@ -6,6 +6,7 @@ import kaggle_environments.envs.kore_fleets.helpers as kf
 import shipyardmanager
 import parameters
 import unit_tests
+import fleet_info
 
 print(f"{__name__} {parameters.VERSION}")
 
@@ -33,31 +34,6 @@ class Agent:
         return self.scheduler.get_actions(board)
 
 
-class FleetInfo:
-    def __init__(self):
-        self.enemy_attacking_fleets = {}
-        return
-
-    def update(self, board):
-        me = board.current_player
-        players = board.players
-        enemy = None
-        for key, p in players.items():
-            if p.id != me.id:
-                enemy = p
-        enemy_fleets = enemy.fleets
-
-        enemy_fleet_ids = []
-        for e in enemy_fleets:
-            enemy_fleet_ids.append(e.id)
-        pop_these = []
-        for f in self.enemy_attacking_fleets:
-            if f not in enemy_fleet_ids:
-                pop_these.append(f)
-
-        for s_id in pop_these:
-            self.enemy_attacking_fleets.pop(s_id)
-
     @staticmethod
     def is_expanding(board):
         fleets = board.current_player.fleets
@@ -74,7 +50,7 @@ class Scheduler:
         self.sm = shipyardmanager.ShipyardManager()
         self.counter = itertools.count()
         self.priorities = []
-        self.fi = FleetInfo()
+        self.fi = fleet_info.FleetInfo()
 
     def update(self, board, config):
         self.board = copy.deepcopy(board)

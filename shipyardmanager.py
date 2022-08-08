@@ -1,4 +1,7 @@
 import copy
+from typing import List, Union, Dict
+
+import fleet_info
 import sutils
 import shipyard
 import parameters
@@ -6,6 +9,7 @@ import math
 import logging
 import kaggle_environments.envs.kore_fleets.helpers as kf
 import timeit
+import fleet_info
 
 DEBUG = False
 print(f"{__name__} {parameters.VERSION}")
@@ -40,27 +44,19 @@ ROUND_TRIP_DEBUG = False
 
 # ==============================  ShipyardManager =============================
 
-def get_ship_count_in_fleets(fleets):
-    count = 0
-    for f in fleets:
-        count += f.size
-    return count
-
-
-def most_spawning_shipyard(shipyards):
-    best_so_far = 0
-    target = None
-    for es in shipyards:
-        if es.max_spawn > best_so_far:
-            target = es
-            best_so_far = es.max_spawn
-    return target
-
-
-def is_defending(s):
+def is_defending(s: shipyard.Shipyard) -> bool:
     for t in s.tasks:
         if t["type"] == "defending" or t["type"] == "spawn_max_defense":
             return True
+    return False
+
+
+def num_fleets_expanding(fleets: List[kf.Fleet]) -> int:
+    count = 0
+    for f in fleets:
+        if "C" in f.flight_plan:
+            count += 1
+    return count
 
 
 class ShipyardManager:
@@ -79,7 +75,7 @@ class ShipyardManager:
 
         return
 
-    def add(self, s):
+    def add(self, s: shipyard.Shipyard) -> None:
         self.shipyards.append(s)
 
     def update(self, board, config):
@@ -126,14 +122,14 @@ class ShipyardManager:
             if s.position in self.intended_expos:
                 self.true_expos.append(s.position)
 
-    def get_unassigned_shipyards(self):
+    def get_unassigned_shipyards(self) -> List[shipyard.Shipyard]:
         result = []
         for s in self.shipyards:
             if not s.assigned:
                 result.append(s)
         return result
 
-    def get_enemy(self):
+    def get_enemy(self) -> kf.Player:
         me = self.me
         enemy = None
         for s_id, p in self.board.players.items():
@@ -143,7 +139,7 @@ class ShipyardManager:
                 enemy = p
         return enemy
 
-    def excess_vs_conditional(self, board, s):
+    def excess_vs_conditional(self, board: kf.Board, s: shipyard.Shipyard) -> bool:
 
         my_shipyards = self.shipyards
         enemy_shipyards = self.get_enemy().shipyards
@@ -154,14 +150,15 @@ class ShipyardManager:
         ships_max = 999
 
         if len(self.shipyards) >= 15:
-            max_length = 36  #
+            max_length = 36
         else:
-            max_length = 40  # This is basically the chads radius 15.
-        ######################This is key.  The longest available path is capped by conditional time ##################
+            max_length = 40
+
+        #This is the key.  The longest available path is capped by conditional time
 
         if s.excess < s.ship_count and s.excess < 34:
 
-            max_l = min(s.get_conditional() - board.step, max_length)  # need board.step -1 here?
+            max_l = min(s.get_conditional() - board.step, max_length)
             if CONDITIONAL_LOGGING:
                 print(f"{self.board.step} {s.position} Conditional time is {s.conditional_time} max_l is: {max_l}")
 
@@ -251,7 +248,7 @@ class ShipyardManager:
 
         ###############################################################################################################
 
-    def yoyo_out_of_kore(self, s):
+    def yoyo_out_of_kore(self, s: shipyard.Shipyard) -> bool:
         amount = s.excess
         if amount < 8 and self.me.kore > 10:
             s.assign_path.append("amount < 8 kore > 10")
@@ -268,13 +265,11 @@ class ShipyardManager:
             s.assign_path.append("amount < 8")
             return False
 
-    def assign_return_route(self, board, s):
+    def assign_return_route(self, board: kf.Board, s: shipyard.Shipyard) -> bool:
 
         assert s.excess <= s.ship_count
 
-        round_trip_debug = []
-        round_trip_debug.append(s.ship_count)
-        round_trip_debug.append(s.excess)
+        round_trip_debug = [s.ship_count, s.excess]
 
         # if self.is_defending(s):
         # if DEFENSE_LOGGING:
@@ -370,7 +365,6 @@ class ShipyardManager:
             assert best_size <= s.ship_count, f"{self.board.step}, {best_size}, {s.ship_count}, {s.excess}"
             return self.launch(s, fp.get_compact_path(), best_size)
 
-
         else:
 
             s.assign_path.append("round trip best_size <= amount")
@@ -413,7 +407,7 @@ class ShipyardManager:
 
             return self.launch(s, fp, best_size)
 
-    def find_expo_location(self, pos):
+    def find_expo_location(self, pos: kf.Point) -> kf.Point:
         start = pos
         radius = 6
         min_x, min_y = -radius, -radius
@@ -434,7 +428,7 @@ class ShipyardManager:
 
         return candidate_pt
 
-    def find_best_position_for_shipyards(self):
+    def find_best_position_for_shipyards(self) -> Union[kf.Point, None]:
 
         scores = []
         for p in self.board.cells:
@@ -499,24 +493,24 @@ class ShipyardManager:
             nearby_kore = sum(
                 self.board.cells.get(x).kore for x in sutils.find_all_pts_within_radius(self.board, p, r=10))
 
-            scores.append({"score": nearby_kore, "point": p})
+            scores.append((nearby_kore, p))
 
-        scores = sorted(scores, key=lambda x: x["score"])
+        scores = sorted(scores, key=lambda x: x[0])
 
         if len(scores) == 0:
             return None
 
-        pt = scores[-1]
+        k, pt = scores[-1]
 
         return pt
 
-    def get_shipyards_total_ship_count(self, s):
+    def get_shipyards_total_ship_count(self, s: shipyard.Shipyard) -> int:
         s_count = 0
         s_count += s.ship_count
         s_count += sutils.number_of_returning_ships(self.board, self.me.fleets, s.position, 400)
         return s_count
 
-    def find_weakest_shipyard(self):
+    def find_weakest_shipyard(self) -> Union[shipyard.Shipyard, None]:
         scores = []
         for s in self.shipyards:
             if s.position in self.true_expos:
@@ -781,7 +775,7 @@ class ShipyardManager:
                             "reserve_type": 1, "priority": parameters.ATTACK_PRIORITY, "id": s.id}
                     s.push_task(task)
 
-    def assign_unstoppable_attack(self):
+    def assign_unstoppable_attack(self) -> bool:
 
         enemy = self.get_enemy()
         enemy_shipyards = enemy.shipyards
@@ -807,10 +801,7 @@ class ShipyardManager:
                         continue
                     if fs.position != s.position and fs.ship_count >= 21:
                         friendly_count += fs.ship_count
-                starttime = timeit.default_timer()
                 most_defense_can_get = sutils.amount_of_defense_in_n_steps(self.board, steps, e, self.get_enemy())
-                if timeit.default_timer() - starttime > .5:
-                    print(f"{self.board.step} The time difference is :", timeit.default_timer() - starttime)
                 if most_defense_can_get + 10 < s.ship_count + friendly_count:
                     if ATTACK_LOGGING:
                         print(
@@ -838,7 +829,7 @@ class ShipyardManager:
 
                     return True
 
-    def assign_snipe(self):
+    def assign_snipe(self) -> None:
         for s in self.shipyards:
             if s.ship_count >= 40:
 
@@ -852,9 +843,9 @@ class ShipyardManager:
                     s.assign_path.append("snipe")
                     print("SNIPING", "time now", self.board.step, "wait for", wait_time, "target", target, 2 * fs + 1)
 
-    def assign_expanders(self):
+    def assign_expanders(self) -> bool:
         if not self.should_expand():
-            return
+            return False
 
         m_count = 50
         candidate = None
@@ -921,11 +912,10 @@ class ShipyardManager:
                 expo_locations = parameters.expo_locations_p0
 
             if len(expo_locations) == 0:
-                positions = self.find_best_position_for_shipyards()
-                if positions is None:
+                end = self.find_best_position_for_shipyards()
+                if end is None:
                     print("could not find expo location")
                     return False
-                end = positions["point"]
                 if expo_locations is None:
                     return False
             else:
@@ -937,11 +927,10 @@ class ShipyardManager:
                     parameters.expo_locations_p0 = expo_locations
 
         else:
-            positions = self.find_best_position_for_shipyards()
-            if positions is None:
+            end = self.find_best_position_for_shipyards()
+            if end is None:
                 print("could not find expo location")
                 return False
-            end = positions["point"]
 
         base_size = min(50, available)
         if base_size < 50:
@@ -958,7 +947,7 @@ class ShipyardManager:
         self.intended_expos[s.position] = 1
         return self.launch(s, fp, base_size)
 
-    def assign_defend(self, s, task):
+    def assign_defend(self, s: shipyard.Shipyard, task: Dict[str, int]) -> bool:
         reserved = task["reserved"]
         end = task["location"]
         amount = min(s.ship_count, reserved)
@@ -978,7 +967,7 @@ class ShipyardManager:
             print(f"Step {self.board.step}: {s.position} DEFENDING location {end} amount {amount}")
         return self.launch(s, fp, amount)
 
-    def attack_shipyard(self, s, task):
+    def attack_shipyard(self, s: shipyard.Shipyard, task: Dict[str, int]) -> bool:
         reserved = task["reserved"]
         location = task["location"]
         amount = min(s.ship_count, reserved, s.excess)
@@ -990,7 +979,7 @@ class ShipyardManager:
         s.assign_path.append("attack shipyard")
         return self.launch(s, fp, amount)
 
-    def get_shipyard_by_id(self, sid):
+    def get_shipyard_by_id(self, sid: int) -> Union[shipyard.Shipyard, None]:
         for s in self.shipyards:
             if s.id == sid:
                 return s
@@ -1005,7 +994,7 @@ class ShipyardManager:
 
         return None
 
-    def can_we_defend(self, target_s, fleet):
+    def can_we_defend(self, target_s: shipyard.Shipyard, fleet: Dict[str, int]) -> bool:
         attack_time = fleet["step"]
         fleet_size = fleet["size"]
         fleets = self.me.fleets
@@ -1052,14 +1041,14 @@ class ShipyardManager:
 
         return False
 
-    def cannot_defend_abandon_ship(self, s, attack_time):
+    def cannot_defend_abandon_ship(self, s: shipyard.Shipyard, attack_time: int) -> bool:
         task = {"type": "abandon", "request_time": attack_time,
-                "reserved": 500, "reserve_type": 1, "priority": parameters.ABANDON_PRIORITY,
+                "reserved": s.ship_count + 500, "reserve_type": 1, "priority": parameters.ABANDON_PRIORITY,
                 "id": s.id, }
         s.push_task(task)
         return False
 
-    def abandon(self, s, task):
+    def abandon(self, s: shipyard.Shipyard) -> bool:
 
         amount = s.ship_count
         min_dist = 42
@@ -1081,7 +1070,7 @@ class ShipyardManager:
         fp = fp.get_compact_path()
         return self.launch(s, fp, amount)
 
-    def assign_defenders(self, fi, board):
+    def assign_defenders(self, fi: fleet_info.FleetInfo, board: kf.Board) -> None:
 
         defense_priority = parameters.DEFEND_PRIORITY
         attacking_fleets = sutils.under_attack(self.board, self.get_enemy().fleets)
@@ -1173,35 +1162,7 @@ class ShipyardManager:
 
         return
 
-    # to estimate max spawn ability better we should take into account that during time t the shipyards can spawn more
-    def max_spawn_ability(self):
-        ms = 0
-        for s in self.shipyards:
-            ms += s.max_spawn
-        return ms
-
-    def max_can_spawn_in_n_turns(self, n):
-        amount = 0
-        for s in self.shipyards:
-            amount += sutils.amount_ships_can_spawn_in_n_steps(self.board, n, s)
-
-        return amount
-
-    def num_fleets_expanding(self, fleets):
-        count = 0
-        for f in fleets:
-            if "C" in f.flight_plan:
-                count += 1
-        return count
-
-    def num_ships_expanding(self, fleets):
-        count = 0
-        for f in fleets:
-            if "C" in f.flight_plan:
-                count += f.ship_count
-        return count
-
-    def num_expansions_in_tasks(self):
+    def num_expansions_in_tasks(self) -> int:
         count = 0
         for s in self.shipyards:
             for t in s.tasks:
@@ -1210,7 +1171,7 @@ class ShipyardManager:
 
         return count
 
-    def can_spend_incoming_kore(self, spend_turns):
+    def can_spend_incoming_kore(self, spend_turns: int) -> bool:
 
         if self.board.step > 150:
             debug = 1
@@ -1261,9 +1222,9 @@ class ShipyardManager:
 
         return True
 
-    def should_expand(self):
+    def should_expand(self) -> bool:
 
-        num_pending_expos = self.num_fleets_expanding(self.me.fleets) + self.num_expansions_in_tasks()
+        num_pending_expos = num_fleets_expanding(self.me.fleets) + self.num_expansions_in_tasks()
 
         if len(self.shipyards) < 10 and num_pending_expos > 0:
             if EXPO_LOGGING:
@@ -1282,7 +1243,7 @@ class ShipyardManager:
                 return False
 
         enemy = self.get_enemy()
-        enemy_sys = len(enemy.shipyards) + self.num_fleets_expanding(enemy.fleets)
+        enemy_sys = len(enemy.shipyards) + num_fleets_expanding(enemy.fleets)
         enemy_ship_count = sutils.get_total_ships(enemy.shipyards, enemy.fleets)
 
         if num_sys > enemy_sys and my_ship_count < enemy_ship_count:
@@ -1302,7 +1263,7 @@ class ShipyardManager:
             print(f"{self.board.step} Lets expo")
         return True
 
-    def spawn_max(self, s):
+    def spawn_max(self, s: shipyard.Shipyard) -> bool:
         # max spawn
         if self.board.step >= 390 and len(self.shipyards) > 5:
             s.assign_path.append("not spawning turn limit")
@@ -1320,7 +1281,7 @@ class ShipyardManager:
         s.assigned = True
         return True
 
-    def launch(self, s, fp, amount):
+    def launch(self, s: shipyard.Shipyard, fp: str, amount: int) -> bool:
         amount = int(amount)
         error_check = True
 

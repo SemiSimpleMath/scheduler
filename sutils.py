@@ -1,5 +1,7 @@
 import heapq as hq
 import random
+from typing import List
+
 import numpy as np
 import statistics
 import logging
@@ -1363,7 +1365,7 @@ def ships_needed_for_fp(fp):
             return i
 
 
-def find_all_pts_within_radius(board, pt, r):
+def find_all_pts_within_radius(board: kf.Board, pt: kf.Point, r: float) -> List[kf.Point]:
     if (pt, r) in cache.points_near:
         return cache.points_near[(pt, r)]
     points = []
