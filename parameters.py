@@ -1,6 +1,6 @@
 import kaggle_environments.envs.kore_fleets.helpers as kf
-expo_locations_p0 = [kf.Point(7, 11)] #, kf.Point(4, 12), kf.Point(8, 16)]  # , kf.Point(3, 9), kf.Point(3, 18)]
-expo_locations_p1 = [kf.Point(13, 8), kf.Point(17, 8), kf.Point(9, 4)]  # , kf.Point(12, 3), kf.Point(16, 11), kf.Point(15, 10)]
+expo_locations_p0 = []#[kf.Point(7, 11)] #, kf.Point(4, 12), kf.Point(8, 16)]  # , kf.Point(3, 9), kf.Point(3, 18)]
+expo_locations_p1 = []#[kf.Point(13, 8)] #, kf.Point(17, 8), kf.Point(9, 4)]  # , kf.Point(12, 3), kf.Point(16, 11), kf.Point(15, 10)]
 
 USE_EXPO_LOCATIONS = True
 ABANDON_PRIORITY = 7
@@ -31,6 +31,6 @@ paths_overlap_param2 = 1 # num of fleets that are allowed to overlap
 
 MAX_WAIT_TIME_TO_EXPO = 20
 USE_SY_PATHS = False
-VERSION = 1.46
+VERSION = 1.61
 
 print(f"{__name__} {VERSION}")

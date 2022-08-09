@@ -1,7 +1,8 @@
-import kaggle_environments.envs.kore_fleets.helpers as kf
-import numpy as np
 import parameters
 import sutils
+import kaggle_environments.envs.kore_fleets.helpers as kf
+import numpy as np
+
 
 print(f"{__name__} {parameters.VERSION}")
 

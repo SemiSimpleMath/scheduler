@@ -1,10 +1,11 @@
-import copy
-from typing import List, Union, Dict
-
 import fleet_info
 import sutils
 import shipyard
 import parameters
+
+import copy
+from typing import List, Union, Dict
+
 import math
 import logging
 import kaggle_environments.envs.kore_fleets.helpers as kf
@@ -57,6 +58,13 @@ def num_fleets_expanding(fleets: List[kf.Fleet]) -> int:
         if "C" in f.flight_plan:
             count += 1
     return count
+
+
+def is_attacking(s):
+    for t in s.tasks:
+        if t["type"] == "attack_shipyard":
+            return True
+    return False
 
 
 class ShipyardManager:
@@ -351,12 +359,14 @@ class ShipyardManager:
 
             if best_size == 8 and self.me.kore > self.get_enemy().kore + 500:
                 return False
+
             #### remove this soon ###
             best_size = min(best_size, amount)
             assert best_size <= amount, f"{best_size}, {amount}"
 
             round_trip_debug.append("Dont wait for more")
             round_trip_debug.append(best_size)
+
             if fp is None:
                 s.assign_path.append("no fp here")
                 return False
@@ -701,14 +711,8 @@ class ShipyardManager:
 
         return target
 
-    def is_attacking(self, s):
-        for t in s.tasks:
-            if t["type"] == "attack_shipyard":
-                return True
-        return False
-
     def should_attack(self, s):
-        if self.is_attacking(s):
+        if is_attacking(s):
             return False
         if s.excess < 50:
             return False
@@ -797,7 +801,7 @@ class ShipyardManager:
                 friendly_sys = sutils.find_nearby_player_shipyards(self.board, e.position, steps, self.shipyards)
                 friendly_count = 0
                 for fs in friendly_sys:
-                    if self.is_attacking(fs):
+                    if is_attacking(fs):
                         continue
                     if fs.position != s.position and fs.ship_count >= 21:
                         friendly_count += fs.ship_count
@@ -805,9 +809,11 @@ class ShipyardManager:
                 if most_defense_can_get + 10 < s.ship_count + friendly_count:
                     if ATTACK_LOGGING:
                         print(
-                            f'Turn: {self.board.step}, Unstoppable attack, Target: {e.position} Most defense can get: {most_defense_can_get}')
+                            f'Turn: {self.board.step}, Unstoppable attack, Target: {e.position}'
+                            f' Most defense can get: {most_defense_can_get}')
                         print(
-                            f'Initiated by {s.position}, distance {steps}, ship count {s.ship_count}, friendly_count: {friendly_count}')
+                            f'Initiated by {s.position}, distance {steps}, ship count {s.ship_count},'
+                            f' friendly_count: {friendly_count}')
 
                     unstoppable_priority = parameters.UNSTOPPABLE_ATTACK_PRIORITY - e.max_spawn / 10
                     task = {"type": "attack_shipyard", "request_time": self.board.step, "location": e.position,
@@ -817,7 +823,7 @@ class ShipyardManager:
                     s.push_task(task)
 
                     for fs in friendly_sys:
-                        if self.is_attacking(fs) or fs.position == s.position:
+                        if is_attacking(fs) or fs.position == s.position:
                             continue
                         fs_dist = sutils.manhattan_distance(self.board, fs.position, e.position)
                         wait_time = steps - fs_dist

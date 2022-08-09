@@ -8,17 +8,16 @@ import sys
 print(sys.argv)
 run_num = sys.argv[-1]
 beta_chad = agents.beta_chad.main.agent
-jjj = agents.beta_chad.main.agent
-
+jjj = agents.jjj.main.agent
 agent1 = main.agent
 env = make("kore_fleets", debug=True)
 print(env.name, env.version)
 
 env.reset(2)
 #opponent = beta_chad
-opponent = jjj
-env.run([agent1, opponent])
-
+opponent = agents.sched_161.main.agent
+#env.run([agent1, opponent])
+env.run([opponent, agent1])
 final_state = env.steps[-1]
 
 s1, s2 = final_state

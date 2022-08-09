@@ -1,12 +1,14 @@
+import shipyardmanager
+import parameters
+import fleet_info
+import sutils
+
 import copy
 import heapq as hq
 import itertools
-import sutils
+
 import kaggle_environments.envs.kore_fleets.helpers as kf
-import shipyardmanager
-import parameters
-import unit_tests
-import fleet_info
+
 
 print(f"{__name__} {parameters.VERSION}")
 
@@ -131,7 +133,7 @@ class Scheduler:
             return self.sm.attack_shipyard(s, task)
 
         if task["type"] == "abandon":
-            return self.sm.abandon(s, task)
+            return self.sm.abandon(s)
 
 
         return

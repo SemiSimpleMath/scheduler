@@ -1,3 +1,6 @@
+import path_class
+import parameters
+
 import heapq as hq
 import random
 from typing import List
@@ -8,8 +11,8 @@ import logging
 import inspect
 import datetime
 import kaggle_environments.envs.kore_fleets.helpers as kf
-import path_class
-import parameters
+
+
 import math
 import json
 import kaggle_environments
